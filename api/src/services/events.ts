@@ -1,20 +1,13 @@
-import { EventEmitter } from "node:events";
 import type { Response } from "express";
 
 /**
- * Bus d'événements temps réel (Server-Sent Events), par commande.
- * Mono-instance : pour plusieurs instances, brancher ce bus sur
- * Postgres LISTEN/NOTIFY ou Redis pub/sub.
+ * Temps réel par Server-Sent Events alimentés par la base.
+ * Chaque flux interroge Postgres à intervalle court et ne pousse un message
+ * que lorsque l'empreinte de l'état change. Aucun état en mémoire partagé :
+ * fonctionne avec plusieurs instances (Vercel, autoscaling).
+ * Le flux se ferme de lui-même avant la durée maximale d'une fonction
+ * serverless ; EventSource se reconnecte automatiquement.
  */
-const bus = new EventEmitter();
-bus.setMaxListeners(0);
-
-export type LiveEvent =
-  | { type: "fulfillment"; status: string; note?: string | null }
-  | { type: "progress"; step: "cards" | "sending"; done: number; total: number }
-  | { type: "rsvp"; guestId: string; status: string; seats: number; rsvpNote: string | null; respondedAt: string | null }
-  | { type: "guest"; guestId: string; patch: Record<string, unknown> }
-  | { type: "counts"; counts: RsvpCounts };
 
 export interface RsvpCounts {
   accepted: number;
@@ -23,25 +16,51 @@ export interface RsvpCounts {
   seats: number;
 }
 
-export function publish(orderId: string, event: LiveEvent) {
-  bus.emit(orderId, event);
+export interface Tick {
+  /** Empreinte de l'état : un message n'est envoyé que si elle change. */
+  key: string;
+  /** Construit le message (appelé seulement en cas de changement). */
+  build: () => Promise<unknown>;
 }
 
-/** Ouvre un flux SSE ; `filter` permet de ne pousser qu'une partie des événements (page publique). */
-export function openStream(res: Response, orderId: string, filter: (e: LiveEvent) => boolean = () => true, initial?: LiveEvent[]) {
+export function openPollingStream(
+  res: Response,
+  tick: () => Promise<Tick>,
+  { intervalMs = 2000, maxMs = 240_000 }: { intervalMs?: number; maxMs?: number } = {},
+) {
   res.writeHead(200, {
     "Content-Type": "text/event-stream; charset=utf-8",
     "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
     "X-Accel-Buffering": "no",
   });
-  const send = (e: LiveEvent) => res.write(`data: ${JSON.stringify(e)}\n\n`);
-  initial?.forEach(send);
-  const listener = (e: LiveEvent) => filter(e) && send(e);
-  bus.on(orderId, listener);
-  const ping = setInterval(() => res.write(": ping\n\n"), 25_000);
+  res.write("retry: 2000\n\n");
+
+  let closed = false;
+  let lastKey = "";
+  let lastWrite = Date.now();
+  const started = Date.now();
   res.on("close", () => {
-    clearInterval(ping);
-    bus.off(orderId, listener);
+    closed = true;
   });
+
+  (async () => {
+    while (!closed && Date.now() - started < maxMs) {
+      try {
+        const t = await tick();
+        if (t.key !== lastKey) {
+          lastKey = t.key;
+          res.write(`data: ${JSON.stringify(await t.build())}\n\n`);
+          lastWrite = Date.now();
+        } else if (Date.now() - lastWrite > 20_000) {
+          res.write(": ping\n\n");
+          lastWrite = Date.now();
+        }
+      } catch (err) {
+        console.log("[stream]", err instanceof Error ? err.message : err);
+      }
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+    if (!closed) res.end();
+  })();
 }

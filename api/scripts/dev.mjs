@@ -32,11 +32,11 @@ if (/127\.0\.0\.1:5433|localhost:5433/.test(process.env.DATABASE_URL ?? "") && !
 }
 
 const tsc = join(ROOT, "node_modules", "typescript", "bin", "tsc");
-if (!existsSync(join(ROOT, "dist", "server.js"))) {
+if (!existsSync(join(ROOT, "dist", "main.js"))) {
   await new Promise((r) => spawn(process.execPath, [tsc, "-p", "tsconfig.json"], { cwd: ROOT, stdio: "inherit" }).on("exit", r));
 }
 run([tsc, "-p", "tsconfig.json", "--watch", "--preserveWatchOutput"], "tsc");
-run(["--watch-path=dist", "--enable-source-maps", "dist/server.js"], "api");
+run(["--watch-path=dist", "--enable-source-maps", "dist/main.js"], "api");
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {

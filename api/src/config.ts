@@ -1,15 +1,20 @@
 import "dotenv/config";
 
 function required(name: string, fallback?: string): string {
-  const value = process.env[name] ?? fallback;
+  const value = process.env[name] || fallback;
   if (!value) throw new Error(`Variable d'environnement manquante : ${name}`);
   return value;
 }
 
+/** Sur Vercel, l'URL de déploiement sert d'URL publique par défaut. */
+const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : undefined;
+
 export const config = {
   port: Number(process.env.PORT ?? 4000),
-  databaseUrl: required("DATABASE_URL"),
-  publicApiUrl: required("PUBLIC_API_URL", "http://localhost:4000").replace(/\/$/, ""),
+  // DATABASE_URL, ou les variables injectées par l'intégration Vercel ↔ Supabase
+  databaseUrl: required("DATABASE_URL", process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL),
+  isVercel: Boolean(process.env.VERCEL),
+  publicApiUrl: required("PUBLIC_API_URL", vercelUrl ?? "http://localhost:4000").replace(/\/$/, ""),
   publicWebUrl: required("PUBLIC_WEB_URL", "http://localhost:3300").replace(/\/$/, ""),
   adminToken: required("ADMIN_TOKEN"),
   storageDir: process.env.STORAGE_DIR ?? ".data/storage",
@@ -23,7 +28,7 @@ export const config = {
   },
 
   supabase: {
-    url: process.env.SUPABASE_URL ?? "",
+    url: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "",
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
     bucket: process.env.SUPABASE_BUCKET ?? "sceau",
   },

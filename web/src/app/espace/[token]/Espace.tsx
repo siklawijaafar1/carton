@@ -21,7 +21,6 @@ const METHODES: Record<string, string> = { WAVECI: "Wave", OMCIV2: "Orange Money
 export function Espace({ token }: { token: string }) {
   const [order, setOrder] = useState<OrderView | null>(null);
   const [counts, setCounts] = useState<Counts>({ accepted: 0, declined: 0, pending: 0, seats: 0 });
-  const [progress, setProgress] = useState<{ step: string; done: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filtre, setFiltre] = useState<Filtre>("TOUS");
   const [recherche, setRecherche] = useState("");
@@ -47,33 +46,22 @@ export function Espace({ token }: { token: string }) {
     const es = new EventSource(`${API_URL}/api/orders/${token}/stream`);
     es.onopen = () => setLive(true);
     es.onerror = () => setLive(false);
+    // Le serveur pousse un instantané complet à chaque changement en base.
     es.onmessage = (msg) => {
-      const e = JSON.parse(msg.data);
-      if (e.type === "counts") setCounts(e.counts);
-      if (e.type === "progress") setProgress(e);
-      if (e.type === "fulfillment") {
-        setOrder((o) => (o ? { ...o, fulfillment: e.status, fulfillmentNote: e.note ?? o.fulfillmentNote } : o));
-        if (e.status === "READY" || e.status === "FAILED") load();
-      }
-      if (e.type === "rsvp" || e.type === "guest") {
-        setOrder((o) =>
-          o
-            ? {
-                ...o,
-                guests: o.guests.map((g) =>
-                  g.id === e.guestId ? { ...g, ...(e.type === "rsvp" ? { status: e.status, seats: e.seats, rsvpNote: e.rsvpNote, respondedAt: e.respondedAt } : e.patch) } : g,
-                ),
-              }
-            : o,
-        );
-        if (e.type === "rsvp") {
-          setFlash(e.guestId);
+      const e = JSON.parse(msg.data) as { type: string; order: OrderView; counts: Counts };
+      if (e.type !== "snapshot") return;
+      setOrder((prev) => {
+        const changed = prev && e.order.guests.find((g) => prev.guests.find((p) => p.id === g.id)?.respondedAt !== g.respondedAt && g.respondedAt);
+        if (changed) {
+          setFlash(changed.id);
           setTimeout(() => setFlash(null), 2400);
         }
-      }
+        return e.order;
+      });
+      setCounts(e.counts);
     };
     return () => es.close();
-  }, [token, load]);
+  }, [token]);
 
   async function patchGuest(id: string, patch: Partial<Pick<GuestView, "callDone" | "callNote" | "status">>) {
     setOrder((o) => (o ? { ...o, guests: o.guests.map((g) => (g.id === id ? { ...g, ...patch } : g)) } : o));
@@ -130,6 +118,12 @@ export function Espace({ token }: { token: string }) {
 
   const pack = order.pack;
   const total = order.guests.length;
+  const progress =
+    order.fulfillment === "GENERATING" && order.progressTotal > 0
+      ? { step: "cards", done: order.progress, total: order.progressTotal }
+      : order.fulfillment === "SENDING"
+        ? { step: "sending", done: order.guests.filter((g) => g.delivery !== "NOT_SENT").length, total: order.guests.filter((g) => g.phoneNumber).length }
+        : null;
   const rang = order.paymentStatus === "PAID" ? RANG[order.fulfillment] ?? 0 : -1;
   const etapes = ETAPES_PROD.filter((e) => e.id !== "SENDING" || pack.autoSend);
   const repondus = counts.accepted + counts.declined;

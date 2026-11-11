@@ -63,6 +63,8 @@ export interface OrderView {
   paidAt: string | null;
   fulfillment: Fulfillment;
   fulfillmentNote: string | null;
+  progress: number;
+  progressTotal: number;
   archiveReady: boolean;
   backgroundUrl: string | null;
   createdAt: string;

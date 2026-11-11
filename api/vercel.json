@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm ci --include=dev",
+  "buildCommand": "npm run vercel-build",
+  "outputDirectory": "public",
+  "rewrites": [{ "source": "/(.*)", "destination": "/api" }],
+  "functions": {
+    "api/index.js": {
+      "maxDuration": 300,
+      "includeFiles": "{dist/**,node_modules/@fontsource/*/files/*-latin-[0-9]*.woff,node_modules/@resvg/resvg-wasm/index_bg.wasm}"
+    }
+  }
+}

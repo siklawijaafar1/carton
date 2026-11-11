@@ -18,3 +18,12 @@ export async function rsvpCounts(orderId: string): Promise<RsvpCounts> {
   }
   return counts;
 }
+
+/** Empreinte légère de l'état d'une commande (statut de production + dernière modification d'invité). */
+export async function orderFingerprint(orderId: string): Promise<string> {
+  const [order, latest] = await Promise.all([
+    prisma.order.findUnique({ where: { id: orderId }, select: { updatedAt: true, fulfillment: true, progress: true, paymentStatus: true } }),
+    prisma.guest.aggregate({ where: { orderId }, _max: { updatedAt: true } }),
+  ]);
+  return `${order?.paymentStatus}|${order?.fulfillment}|${order?.progress}|${order?.updatedAt.getTime()}|${latest._max.updatedAt?.getTime()}`;
+}

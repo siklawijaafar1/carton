@@ -41,6 +41,8 @@ model Order {
   // + Production
   fulfillment     FulfillmentStatus @default(WAITING_PAYMENT)
   fulfillmentNote String?
+  progress        Int       @default(0) // cartes produites dans la passe en cours (reprise)
+  progressTotal   Int       @default(0)
   archivePath     String? // ZIP prêt à télécharger
   paidAt          DateTime?
   paymentMethod   String? // WAVE, OM, MOMO, FLOOZ, CARD… (renvoyé par l'agrégateur)
@@ -70,8 +72,10 @@ model Guest {
   sentAt       DateTime?
   callNote     String? // compte rendu de la relance téléphonique
   position     Int            @default(0) // ordre de saisie
+  updatedAt    DateTime       @default(now()) @updatedAt
 
   @@index([orderId, status])
+  @@index([orderId, updatedAt])
 }
 
 // + Journal brut des notifications de paiement (audit, idempotence)

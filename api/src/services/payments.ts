@@ -3,8 +3,7 @@ import { prisma } from "../db.js";
 import { config, paymentMode } from "../config.js";
 import { PACKS } from "../packs.js";
 import { checkPayment, initPayment } from "./cinetpay.js";
-import { enqueueFulfillment } from "./fulfillment.js";
-import { publish } from "./events.js";
+import { startFulfillment } from "./fulfillment.js";
 import type { Order } from "../generated/prisma/client.js";
 
 export class PaymentError extends Error {
@@ -79,12 +78,10 @@ export async function applyPaymentResult(result: ConfirmedPayment): Promise<{ or
         paymentMethod: result.paymentMethod,
         amountPaid: result.amount,
         fulfillment: "QUEUED",
+        progress: 0,
       },
     });
-    if (count === 1) {
-      publish(order.id, { type: "fulfillment", status: "QUEUED" });
-      enqueueFulfillment(order.id);
-    }
+    if (count === 1) startFulfillment(order.id);
     return { orderId: order.id, changed: count === 1 };
   }
 

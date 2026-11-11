@@ -4,9 +4,7 @@ import { prisma } from "../db.js";
 import { config } from "../config.js";
 import { HttpError } from "../http.js";
 import { guestPatchSchema } from "../validation.js";
-import { enqueueFulfillment } from "../services/fulfillment.js";
-import { publish } from "../services/events.js";
-import { rsvpCounts } from "../services/rsvp.js";
+import { startFulfillment } from "../services/fulfillment.js";
 
 export const adminRouter = Router();
 
@@ -81,19 +79,24 @@ adminRouter.get("/followups", async (req, res) => {
 
 adminRouter.patch("/guests/:id", async (req, res) => {
   const patch = guestPatchSchema.parse(req.body);
-  const guest = await prisma.guest.update({
+  await prisma.guest.update({
     where: { id: req.params.id },
     data: { ...patch, ...(patch.status ? { respondedAt: patch.status === "PENDING" ? null : new Date() } : {}) },
   });
-  publish(guest.orderId, { type: "guest", guestId: guest.id, patch });
-  if (patch.status) publish(guest.orderId, { type: "counts", counts: await rsvpCounts(guest.orderId) });
   res.json({ ok: true });
 });
 
+/** Refait toutes les cartes et le ZIP (les envois déjà faits ne sont pas répétés). */
 adminRouter.post("/orders/:id/regenerate", async (req, res) => {
   const order = await prisma.order.findUnique({ where: { id: req.params.id } });
   if (!order || order.paymentStatus !== "PAID") throw new HttpError(409, "Commande non payée.");
-  await prisma.order.update({ where: { id: order.id }, data: { fulfillment: "QUEUED", fulfillmentNote: null } });
-  enqueueFulfillment(order.id);
+  await prisma.order.update({ where: { id: order.id }, data: { fulfillment: "QUEUED", fulfillmentNote: null, progress: 0, archivePath: null } });
+  startFulfillment(order.id);
   res.json({ ok: true });
+});
+
+/** Suite d'une production mise en pause (appelée par l'API elle-même). */
+adminRouter.post("/orders/:id/continue", async (req, res) => {
+  startFulfillment(String(req.params.id));
+  res.status(202).json({ ok: true });
 });

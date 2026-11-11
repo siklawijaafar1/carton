@@ -5,9 +5,9 @@ import { createOrderSchema, guestPatchSchema } from "../validation.js";
 import { HttpError, notFound, rateLimit } from "../http.js";
 import { startCheckout, reconcile } from "../services/payments.js";
 import { getFile, publicUrl } from "../services/storage.js";
-import { openStream, publish } from "../services/events.js";
-import { rsvpCounts } from "../services/rsvp.js";
-import { deliverInvitation, orderDesign, rsvpUrl } from "../services/fulfillment.js";
+import { openPollingStream } from "../services/events.js";
+import { orderFingerprint, rsvpCounts } from "../services/rsvp.js";
+import { deliverInvitation, orderDesign, resumeIfStalled, rsvpUrl } from "../services/fulfillment.js";
 import type { Guest, Order } from "../generated/prisma/client.js";
 
 export const ordersRouter = Router();
@@ -54,6 +54,8 @@ function serializeOrder(o: Order & { guests: Guest[] }) {
     paidAt: o.paidAt,
     fulfillment: o.fulfillment,
     fulfillmentNote: o.fulfillmentNote,
+    progress: o.progress,
+    progressTotal: o.progressTotal,
     archiveReady: Boolean(o.archivePath),
     backgroundUrl: o.backgroundUrl ? publicUrl(o.backgroundUrl) : null,
     createdAt: o.createdAt,
@@ -100,6 +102,7 @@ ordersRouter.get("/:token", async (req, res) => {
     await reconcile(order).catch((err) => console.log("[reconcile]", err instanceof Error ? err.message : err));
     order = await findByToken(req.params.token);
   }
+  resumeIfStalled(order);
   res.json({ order: serializeOrder(order), counts: await rsvpCounts(order.id) });
 });
 
@@ -119,8 +122,23 @@ ordersRouter.get("/:token/archive", async (req, res) => {
 });
 
 ordersRouter.get("/:token/stream", async (req, res) => {
-  const order = await findByToken(req.params.token);
-  openStream(res, order.id, () => true, [{ type: "counts", counts: await rsvpCounts(order.id) }]);
+  const { id } = await findByToken(req.params.token);
+  let lastResumeCheck = 0;
+  // Instantané complet de la commande à chaque changement (production, réponses, envois).
+  openPollingStream(res, async () => {
+    if (Date.now() - lastResumeCheck > 30_000) {
+      lastResumeCheck = Date.now();
+      const o = await prisma.order.findUnique({ where: { id }, select: { id: true, paymentStatus: true, fulfillment: true, updatedAt: true } });
+      if (o) resumeIfStalled(o);
+    }
+    return {
+      key: await orderFingerprint(id),
+      build: async () => {
+        const order = await prisma.order.findUniqueOrThrow({ where: { id }, include: { guests: { orderBy: { position: "asc" } } } });
+        return { type: "snapshot", order: serializeOrder(order), counts: await rsvpCounts(id) };
+      },
+    };
+  });
 });
 
 /* Suivi des invités (formule Super) : relance téléphonique, correction manuelle */
@@ -136,8 +154,6 @@ ordersRouter.patch("/:token/guests/:guestId", async (req, res) => {
       ...(patch.status && patch.status !== guest.status ? { respondedAt: patch.status === "PENDING" ? null : new Date() } : {}),
     },
   });
-  publish(order.id, { type: "guest", guestId: guest.id, patch: serializeGuest(updated, true) });
-  if (patch.status || patch.seats) publish(order.id, { type: "counts", counts: await rsvpCounts(order.id) });
   res.json({ guest: serializeGuest(updated, true) });
 });
 

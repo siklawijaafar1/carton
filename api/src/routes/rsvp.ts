@@ -4,7 +4,7 @@ import { PACKS } from "../packs.js";
 import { rsvpSchema } from "../validation.js";
 import { HttpError, notFound, rateLimit } from "../http.js";
 import { publicUrl } from "../services/storage.js";
-import { openStream, publish } from "../services/events.js";
+import { openPollingStream } from "../services/events.js";
 import { rsvpCounts } from "../services/rsvp.js";
 import { orderDesign } from "../services/fulfillment.js";
 
@@ -47,20 +47,18 @@ rsvpRouter.post("/:token", rateLimit(20, 10 * 60_000), async (req, res) => {
     data: { status: input.status, seats: input.status === "ACCEPTED" ? input.seats : 1, rsvpNote: input.note ?? null, respondedAt: new Date() },
   });
   const counts = await rsvpCounts(guest.orderId);
-  publish(guest.orderId, {
-    type: "rsvp",
-    guestId: guest.id,
-    status: updated.status,
-    seats: updated.seats,
-    rsvpNote: updated.rsvpNote,
-    respondedAt: updated.respondedAt?.toISOString() ?? null,
-  });
-  publish(guest.orderId, { type: "counts", counts });
   res.json({ status: updated.status, seats: updated.seats, counts });
 });
 
 /** Compteur public en direct : uniquement les totaux, jamais les noms. */
 rsvpRouter.get("/:token/stream", async (req, res) => {
   const guest = await findGuest(req.params.token);
-  openStream(res, guest.orderId, (e) => e.type === "counts", [{ type: "counts", counts: await rsvpCounts(guest.orderId) }]);
+  openPollingStream(
+    res,
+    async () => {
+      const counts = await rsvpCounts(guest.orderId);
+      return { key: JSON.stringify(counts), build: async () => ({ type: "counts", counts }) };
+    },
+    { intervalMs: 4000 },
+  );
 });

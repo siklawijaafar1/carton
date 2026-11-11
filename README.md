@@ -72,16 +72,32 @@ appliquée par `scripts/db-local.mjs` à la place du moteur Prisma.
 
 ## Mise en production
 
-1. **Base + fichiers** : un projet Supabase (Postgres + bucket privé `sceau`).
-   `DATABASE_URL` = chaîne « Session pooler » (IPv4). Les migrations
-   s'appliquent au démarrage (`npm run start:prod` → `prisma migrate deploy`).
-2. **API** : Render, via le blueprint [render.yaml](render.yaml)
-   (build `npm run build`, santé `/healthz`). Variables : voir
-   [api/.env.example](api/.env.example). Sans clés CinetPay, l'API ne démarre
-   en production que si `ALLOW_PAYMENT_SIMULATION=true` (démo).
-3. **Web** : Vercel, dossier racine `web`, `NEXT_PUBLIC_API_URL` = URL publique de l'API.
+Deux projets Vercel sur le même dépôt, et un projet Supabase.
+
+1. **Supabase** (base + fichiers) : de préférence via l'intégration Vercel ↔
+   Supabase sur le projet API, qui injecte `POSTGRES_PRISMA_URL`,
+   `POSTGRES_URL_NON_POOLING`, `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY`
+   (noms reconnus par l'API). Créer un bucket **privé** `sceau`.
+2. **API** (projet Vercel, dossier racine `api`) : [api/vercel.json](api/vercel.json)
+   compile le TypeScript, applique les migrations (`npm run vercel-build`) et
+   sert toute l'API Express depuis une fonction ([api/api/index.js](api/api/index.js),
+   durée max 300 s). Variables à ajouter : `PUBLIC_WEB_URL`, `ADMIN_TOKEN`
+   (≥ 24 caractères), `NODE_ENV=production`, et `ALLOW_PAYMENT_SIMULATION=true`
+   tant que CinetPay n'est pas branché.
+3. **Web** (projet Vercel, dossier racine `web`, préréglage Next.js) :
+   `NEXT_PUBLIC_API_URL` = URL de l'API.
+
+Fonctionnement serverless : la production des cartes continue après la
+réponse (`waitUntil`), se met en pause avant la limite de temps et se relance
+elle-même ; le temps réel est un flux SSE qui interroge la base (aucun état en
+mémoire partagé). Sur un serveur classique, `npm run build && npm run start:prod`
+fonctionne aussi.
+
 4. **CinetPay** : renseigner `notify_url` = `https://api…/api/webhooks/cinetpay`
    (envoyé automatiquement à chaque transaction) et la clé secrète HMAC.
+4. **CinetPay** : renseigner `notify_url` = `https://api…/api/webhooks/cinetpay`
+   (envoyé automatiquement à chaque transaction) et la clé secrète HMAC.
+
 5. **WhatsApp** : faire approuver le modèle `invitation_evenement`
    (en-tête image, 3 variables). **SMS** : souscrire l'offre Orange SMS CI.
 
