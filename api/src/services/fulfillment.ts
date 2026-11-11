@@ -191,9 +191,9 @@ async function produceCards(
     }
   }
 
-  // 2. Cartes
-  const zip = new JSZip();
-  const folder = zip.folder(slug(`Invitations ${order.eventTitle}`))!;
+  // 2. Cartes (rassemblées puis réparties en archives de taille limitée)
+  const files: { name: string; data: Buffer | string }[] = [];
+  const folder = { file: (name: string, data: Buffer | string) => void files.push({ name, data }) };
   folder.file("00-invitation.png", await renderCardPng(cardDataFor(order, design, null, background), "portrait"));
 
   if (!pack.personalizedNames) {
@@ -222,10 +222,38 @@ async function produceCards(
   const rows = order.guests.map((g) => [g.position + 1, g.name, g.phoneNumber ?? "", ...(pack.rsvp ? [rsvpUrl(g)] : [])]);
   folder.file("liste-invites.csv", "﻿" + [header, ...rows].map((r) => r.map(csvCell).join(";")).join("\r\n"));
 
-  const archive = await zip.generateAsync({ type: "nodebuffer", compression: "DEFLATE", compressionOptions: { level: 6 } });
-  const archivePath = await putFile(`${base}/${slug(order.eventTitle)}-invitations.zip`, archive);
+  // Le CSV et la carte générique vont dans la première partie.
+  files.sort((a, b) => Number(!a.name.startsWith("00-") && a.name !== "liste-invites.csv") - Number(!b.name.startsWith("00-") && b.name !== "liste-invites.csv"));
+  const groups: (typeof files)[] = [[]];
+  let groupSize = 0;
+  for (const f of files) {
+    const size = typeof f.data === "string" ? f.data.length : f.data.length;
+    if (groupSize + size > MAX_ZIP_PART_BYTES && groups.at(-1)!.length) {
+      groups.push([]);
+      groupSize = 0;
+    }
+    groups.at(-1)!.push(f);
+    groupSize += size;
+  }
+  const keys: string[] = [];
+  for (const [i, group] of groups.entries()) {
+    const suffix = groups.length > 1 ? `-partie-${i + 1}` : "";
+    const zip = new JSZip();
+    const dir = zip.folder(slug(`Invitations ${order.eventTitle}${suffix}`))!;
+    for (const f of group) dir.file(f.name, f.data);
+    // Les PNG sont déjà compressés : on les range sans recompression (rapide).
+    const archive = await zip.generateAsync({ type: "nodebuffer", compression: "STORE" });
+    keys.push(await putFile(`${base}/${slug(order.eventTitle)}-invitations${suffix}.zip`, archive));
+  }
   const size = Math.max(total, 1);
-  await prisma.order.update({ where: { id: order.id }, data: { archivePath, progress: size, progressTotal: size } });
+  await prisma.order.update({ where: { id: order.id }, data: { archivePath: keys.join("\n"), progress: size, progressTotal: size } });
+}
+
+/** Une archive par tranche de 40 Mo : sous la limite de 50 Mo par fichier de Supabase (offre gratuite). */
+const MAX_ZIP_PART_BYTES = (Number(process.env.ZIP_PART_MB) || 40) * 1024 * 1024;
+
+export function archiveKeys(order: Pick<Order, "archivePath">): string[] {
+  return order.archivePath ? order.archivePath.split("\n").filter(Boolean) : [];
 }
 
 export async function deliverInvitation(order: Pick<Order, "id" | "eventTitle">, guest: Guest): Promise<void> {

@@ -66,6 +66,7 @@ export interface OrderView {
   progress: number;
   progressTotal: number;
   archiveReady: boolean;
+  archiveParts: number;
   backgroundUrl: string | null;
   createdAt: string;
   guests: GuestView[];

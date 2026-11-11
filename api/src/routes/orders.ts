@@ -4,10 +4,10 @@ import { PACKS } from "../packs.js";
 import { createOrderSchema, guestPatchSchema } from "../validation.js";
 import { HttpError, notFound, rateLimit } from "../http.js";
 import { startCheckout, reconcile } from "../services/payments.js";
-import { getFile, publicUrl } from "../services/storage.js";
+import { getFile, publicUrl, signedUrl } from "../services/storage.js";
 import { openPollingStream } from "../services/events.js";
 import { orderFingerprint, rsvpCounts } from "../services/rsvp.js";
-import { deliverInvitation, orderDesign, resumeIfStalled, rsvpUrl } from "../services/fulfillment.js";
+import { archiveKeys, deliverInvitation, orderDesign, resumeIfStalled, rsvpUrl } from "../services/fulfillment.js";
 import type { Guest, Order } from "../generated/prisma/client.js";
 
 export const ordersRouter = Router();
@@ -57,6 +57,7 @@ function serializeOrder(o: Order & { guests: Guest[] }) {
     progress: o.progress,
     progressTotal: o.progressTotal,
     archiveReady: Boolean(o.archivePath),
+    archiveParts: archiveKeys(o).length,
     backgroundUrl: o.backgroundUrl ? publicUrl(o.backgroundUrl) : null,
     createdAt: o.createdAt,
     guests: o.guests.map((g) => serializeGuest(g, pack.rsvp)),
@@ -111,14 +112,24 @@ ordersRouter.post("/:token/checkout", rateLimit(30, 60 * 60_000), async (req, re
   res.json(await startCheckout(order));
 });
 
+/** Téléchargement d'une partie du ZIP : lien signé direct vers le stockage (aucune limite de taille côté API). */
 ordersRouter.get("/:token/archive", async (req, res) => {
   const order = await findByToken(req.params.token);
-  if (!order.archivePath) throw new HttpError(409, "Les cartes ne sont pas encore prêtes.");
-  const name = order.archivePath.split("/").pop()!;
+  const keys = archiveKeys(order);
+  if (!keys.length) throw new HttpError(409, "Les cartes ne sont pas encore prêtes.");
+  const part = Math.max(1, Number(req.query.part ?? 1) || 1);
+  const key = keys[part - 1];
+  if (!key) throw notFound("Partie d'archive");
+  const name = key.split("/").pop()!;
+  const direct = await signedUrl(key, 600, name);
+  if (direct) {
+    res.redirect(302, direct);
+    return;
+  }
   res
     .type("application/zip")
     .set("Content-Disposition", `attachment; filename="${name}"`)
-    .send(await getFile(order.archivePath));
+    .send(await getFile(key));
 });
 
 ordersRouter.get("/:token/stream", async (req, res) => {

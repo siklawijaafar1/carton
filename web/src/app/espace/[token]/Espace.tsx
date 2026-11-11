@@ -217,9 +217,19 @@ export function Espace({ token }: { token: string }) {
                       : "Votre carte en haute définition, au format statut WhatsApp, et la liste de vos invités."}
                     {pack.autoSend && " Elles ont été envoyées à vos invités par WhatsApp et SMS."}
                   </p>
-                  <a href={`${API_URL}/api/orders/${token}/archive`} className="btn btn-or">
-                    Télécharger le dossier (ZIP)
-                  </a>
+                  {order.archiveParts > 1 ? (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                      {Array.from({ length: order.archiveParts }, (_, i) => (
+                        <a key={i} href={`${API_URL}/api/orders/${token}/archive?part=${i + 1}`} className={`btn ${i === 0 ? "btn-or" : "btn-ligne"}`}>
+                          ZIP · partie {i + 1} / {order.archiveParts}
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <a href={`${API_URL}/api/orders/${token}/archive`} className="btn btn-or">
+                      Télécharger le dossier (ZIP)
+                    </a>
+                  )}
                 </div>
               </div>
             )}

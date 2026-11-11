@@ -15,6 +15,8 @@ interface Backend {
   put(key: string, data: Buffer | Uint8Array, contentType: string): Promise<void>;
   get(key: string): Promise<Buffer>;
   removePrefix(prefix: string): Promise<void>;
+  /** Lien de téléchargement temporaire direct (null : servir le fichier via l'API). */
+  signedUrl(key: string, expiresIn: number, downloadName?: string): Promise<string | null>;
 }
 
 const CONTENT_TYPES: Record<string, string> = {
@@ -62,12 +64,19 @@ const local: Backend = {
   async removePrefix(prefix) {
     await rm(localPath(prefix), { recursive: true, force: true });
   },
+  async signedUrl() {
+    return null;
+  },
 };
 
 /* ---------------- Supabase Storage (API REST) ---------------- */
 function supabase(url: string, serviceKey: string, bucket: string): Backend {
   const base = `${url.replace(/\/$/, "")}/storage/v1`;
-  const headers = { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey };
+  // Nouvelles clés « sb_secret_… » : uniquement dans l'en-tête apikey (la passerelle
+  // Supabase en déduit le rôle). Anciennes clés JWT service_role : apikey + Bearer.
+  const headers: Record<string, string> = serviceKey.startsWith("sb_")
+    ? { apikey: serviceKey }
+    : { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey };
   const objectUrl = (key: string) => `${base}/object/${bucket}/${checkKey(key).split("/").map(encodeURIComponent).join("/")}`;
 
   return {
@@ -101,6 +110,20 @@ function supabase(url: string, serviceKey: string, bucket: string): Backend {
         body: JSON.stringify({ prefixes: items.map((i) => `${prefix.replace(/\/$/, "")}/${i.name}`) }),
       });
     },
+    async signedUrl(key, expiresIn, downloadName) {
+      const res = await fetch(`${base}/object/sign/${bucket}/${checkKey(key).split("/").map(encodeURIComponent).join("/")}`, {
+        method: "POST",
+        headers: { ...headers, "Content-Type": "application/json" },
+        body: JSON.stringify({ expiresIn }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (res.status === 400 || res.status === 404) throw new StorageNotFound(key);
+      if (!res.ok) throw new Error(`Supabase Storage (lien ${key}) : HTTP ${res.status}`);
+      const { signedURL } = (await res.json()) as { signedURL: string };
+      const link = new URL(`${base}${signedURL.startsWith("/") ? "" : "/"}${signedURL}`);
+      if (downloadName) link.searchParams.set("download", downloadName);
+      return link.toString();
+    },
   };
 }
 
@@ -119,6 +142,10 @@ export async function putFile(key: string, data: Buffer | Uint8Array): Promise<s
 
 export function getFile(key: string): Promise<Buffer> {
   return backend.get(key);
+}
+
+export function signedUrl(key: string, expiresIn = 600, downloadName?: string): Promise<string | null> {
+  return backend.signedUrl(key, expiresIn, downloadName);
 }
 
 export function removePrefix(prefix: string): Promise<void> {
