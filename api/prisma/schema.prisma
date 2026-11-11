@@ -1,0 +1,125 @@
+// Sceau — schéma de données (PostgreSQL)
+// Les modèles Order / Guest et les enums reprennent le schéma de référence du
+// cahier des charges ; les champs ajoutés sont signalés par « + ».
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Order {
+  id            String        @id @default(uuid())
+  clientName    String
+  clientPhone   String
+  clientEmail   String
+  eventType     String // Ex: "Mariage", "Gala", "Anniversaire"
+  pack          PackType // BASIC, PRO, SUPER
+  amountPaid    Float // 15000, 50000, ou 200000
+  paymentStatus PaymentStatus @default(PENDING)
+  transactionId String?       @unique
+  createdAt     DateTime      @default(now())
+  guests        Guest[]
+
+  // + Lien privé de l'espace client (pas de compte ni de mot de passe)
+  accessToken     String   @unique @default(uuid())
+  // + Détails de l'événement imprimés sur la carte
+  eventTitle      String // « Aïcha & Karim »
+  eventDate       DateTime
+  venue           String
+  city            String   @default("Abidjan")
+  message         String? // texte libre sous le titre
+  dressCode       String?
+  // + Design : thème, couleurs, polices, fond IA
+  design          Json // { theme, primary, accent, background, titleFont, bodyFont, aiPrompt? }
+  backgroundUrl   String? // fond généré par IA (Super), chemin relatif au stockage
+  // + Production
+  fulfillment     FulfillmentStatus @default(WAITING_PAYMENT)
+  fulfillmentNote String?
+  archivePath     String? // ZIP prêt à télécharger
+  paidAt          DateTime?
+  paymentMethod   String? // WAVE, OM, MOMO, FLOOZ, CARD… (renvoyé par l'agrégateur)
+  updatedAt       DateTime  @updatedAt
+  paymentEvents   PaymentEvent[]
+
+  @@index([paymentStatus])
+}
+
+model Guest {
+  id          String     @id @default(uuid())
+  orderId     String
+  order       Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  name        String
+  phoneNumber String? // + facultatif en Basic / Pro, exigé en Super
+  status      RsvpStatus @default(PENDING)
+  callDone    Boolean    @default(false)
+
+  // + RSVP et diffusion
+  rsvpToken    String         @unique @default(uuid())
+  respondedAt  DateTime?
+  seats        Int            @default(1) // nombre de places réservées
+  rsvpNote     String? // mot laissé par l'invité
+  cardPath     String? // carte personnalisée générée
+  delivery     DeliveryStatus @default(NOT_SENT)
+  deliveryInfo String? // canal utilisé ou erreur du fournisseur
+  sentAt       DateTime?
+  callNote     String? // compte rendu de la relance téléphonique
+  position     Int            @default(0) // ordre de saisie
+
+  @@index([orderId, status])
+}
+
+// + Journal brut des notifications de paiement (audit, idempotence)
+model PaymentEvent {
+  id         String   @id @default(uuid())
+  orderId    String?
+  order      Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  provider   String
+  reference  String
+  verified   Boolean
+  status     String
+  payload    Json
+  receivedAt DateTime @default(now())
+
+  @@index([reference])
+}
+
+enum PackType {
+  BASIC
+  PRO
+  SUPER
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+}
+
+enum RsvpStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+// + Avancement de la production après paiement
+enum FulfillmentStatus {
+  WAITING_PAYMENT
+  QUEUED
+  GENERATING
+  SENDING
+  READY
+  FAILED
+}
+
+// + Diffusion WhatsApp / SMS (formule Super)
+enum DeliveryStatus {
+  NOT_SENT
+  SENT
+  FAILED
+}

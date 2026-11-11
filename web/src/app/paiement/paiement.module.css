@@ -1,0 +1,135 @@
+.page {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 40px var(--gouttiere);
+  background:
+    radial-gradient(50% 50% at 50% 30%, rgba(201, 163, 92, 0.16), transparent 70%),
+    var(--noir);
+}
+
+.boite {
+  width: min(460px, 100%);
+  padding: 34px 30px 28px;
+  display: grid;
+  gap: 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+.centre {
+  text-align: center;
+  justify-items: center;
+}
+
+.centre h1 {
+  font-size: clamp(2rem, 6vw, 2.8rem);
+}
+
+.centre p {
+  margin: 0;
+}
+
+.bandeau {
+  margin: -34px -30px 6px;
+  padding: 8px;
+  text-align: center;
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  background: rgba(201, 163, 92, 0.14);
+  color: var(--or-clair);
+  border-bottom: 1px solid var(--filet);
+}
+
+.entete {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.entete p {
+  margin: 0;
+}
+
+.montant {
+  margin: 0;
+  padding: 16px 0;
+  border-block: 1px solid var(--filet);
+  text-align: center;
+}
+
+.montant span {
+  font-size: 2.6rem;
+  color: var(--or-pale);
+}
+
+.methodes {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.methode {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--rayon-s);
+  border: 1px solid var(--filet);
+  cursor: pointer;
+  transition:
+    border-color 0.3s,
+    background-color 0.3s;
+}
+
+.methode i {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.choisi {
+  border-color: var(--or-clair);
+  background: rgba(201, 163, 92, 0.1);
+}
+
+.refus {
+  background: none;
+  border: 0;
+  color: var(--texte-doux);
+  font-size: 0.82rem;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--texte-doux);
+  text-align: center;
+}
+
+.sceau {
+  filter: grayscale(0.7) brightness(0.8);
+  transform: scale(0.9);
+  transition:
+    filter 1s,
+    transform 1.2s var(--ease);
+  animation: respirer 2.4s ease-in-out infinite;
+}
+
+.scelle {
+  filter: none;
+  transform: scale(1.06) rotate(-8deg);
+  animation: none;
+}
+
+@keyframes respirer {
+  50% {
+    opacity: 0.6;
+  }
+}
