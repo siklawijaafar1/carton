@@ -22,6 +22,12 @@ export const config = {
     baseUrl: process.env.CINETPAY_BASE_URL ?? "https://api-checkout.cinetpay.com/v2",
   },
 
+  supabase: {
+    url: process.env.SUPABASE_URL ?? "",
+    serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+    bucket: process.env.SUPABASE_BUCKET ?? "sceau",
+  },
+
   ai: {
     falKey: process.env.FAL_KEY ?? "",
     pollinationsKey: process.env.POLLINATIONS_KEY ?? "",
@@ -46,6 +52,11 @@ export const config = {
 /** Les paiements passent par la simulation locale tant que les clés CinetPay sont absentes. */
 export const paymentMode = config.cinetpay.apiKey && config.cinetpay.siteId ? "cinetpay" : "simulation";
 
-if (config.isProduction && paymentMode === "simulation") {
-  throw new Error("Clés CinetPay absentes : la simulation de paiement est interdite en production.");
+// En production sans clés CinetPay, il faut l'accepter explicitement (démo) :
+// n'importe qui pourrait sinon « payer » une commande avec la simulation.
+if (config.isProduction && paymentMode === "simulation" && process.env.ALLOW_PAYMENT_SIMULATION !== "true") {
+  throw new Error("Clés CinetPay absentes : définissez-les, ou ALLOW_PAYMENT_SIMULATION=true pour une démo.");
+}
+if (config.isProduction && config.adminToken.length < 24) {
+  throw new Error("ADMIN_TOKEN trop court pour la production (24 caractères minimum).");
 }

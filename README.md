@@ -72,13 +72,14 @@ appliquée par `scripts/db-local.mjs` à la place du moteur Prisma.
 
 ## Mise en production
 
-1. **Base** : PostgreSQL managé, puis `npm run db:deploy` (`prisma migrate deploy`).
-2. **API** : hébergeur Node avec disque persistant (Render, Railway, VPS) :
-   `npm run build && npm start`, variables de [api/.env.example](api/.env.example),
-   `NODE_ENV=production` (la simulation de paiement est alors refusée).
-   Pour un hébergement sans disque, remplacer [storage.ts](api/src/services/storage.ts)
-   par S3 / Supabase Storage.
-3. **Web** : Vercel, `NEXT_PUBLIC_API_URL` = URL publique de l'API.
+1. **Base + fichiers** : un projet Supabase (Postgres + bucket privé `sceau`).
+   `DATABASE_URL` = chaîne « Session pooler » (IPv4). Les migrations
+   s'appliquent au démarrage (`npm run start:prod` → `prisma migrate deploy`).
+2. **API** : Render, via le blueprint [render.yaml](render.yaml)
+   (build `npm run build`, santé `/healthz`). Variables : voir
+   [api/.env.example](api/.env.example). Sans clés CinetPay, l'API ne démarre
+   en production que si `ALLOW_PAYMENT_SIMULATION=true` (démo).
+3. **Web** : Vercel, dossier racine `web`, `NEXT_PUBLIC_API_URL` = URL publique de l'API.
 4. **CinetPay** : renseigner `notify_url` = `https://api…/api/webhooks/cinetpay`
    (envoyé automatiquement à chaque transaction) et la clé secrète HMAC.
 5. **WhatsApp** : faire approuver le modèle `invitation_evenement`
