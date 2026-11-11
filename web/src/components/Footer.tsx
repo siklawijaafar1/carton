@@ -37,7 +37,7 @@ export function Footer() {
         </div>
       </div>
       <div className="conteneur pied-bas">
-        <span>© {new Date().getFullYear()} Sceau · Côte d'Ivoire</span>
+        <span>© {new Date().getFullYear()} Carton · Côte d'Ivoire</span>
         <span className="script or" style={{ fontSize: "1.6rem" }}>L'art de recevoir</span>
       </div>
       <style>{`

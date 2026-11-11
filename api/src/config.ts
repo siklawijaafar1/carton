@@ -30,7 +30,7 @@ export const config = {
   supabase: {
     url: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "",
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-    bucket: process.env.SUPABASE_BUCKET ?? "sceau",
+    bucket: process.env.SUPABASE_BUCKET ?? "carton",
   },
 
   ai: {
@@ -50,7 +50,7 @@ export const config = {
     orangeClientId: process.env.ORANGE_SMS_CLIENT_ID ?? "",
     orangeClientSecret: process.env.ORANGE_SMS_CLIENT_SECRET ?? "",
     orangeSender: process.env.ORANGE_SMS_SENDER ?? "", // ex. tel:+2250700000000
-    senderName: process.env.SMS_SENDER_NAME ?? "SCEAU",
+    senderName: process.env.SMS_SENDER_NAME ?? "CARTON",
   },
 };
 

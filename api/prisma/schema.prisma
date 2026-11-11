@@ -1,4 +1,4 @@
-// Sceau — schéma de données (PostgreSQL)
+// Carton — schéma de données (PostgreSQL)
 // Les modèles Order / Guest et les enums reprennent le schéma de référence du
 // cahier des charges ; les champs ajoutés sont signalés par « + ».
 

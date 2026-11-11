@@ -1,11 +1,11 @@
-# Sceau — invitations d'exception · Abidjan
+# Carton — invitations d'exception · Abidjan
 
 Service SaaS de cartes d'invitation haut de gamme et de gestion d'invités :
 création en ligne, paiement Mobile Money / carte, génération automatique des
 cartes, envoi WhatsApp & SMS et RSVP en temps réel.
 
 ```
-sceau/
+carton/
 ├── api/   Node.js · Express 5 · Prisma 7 · PostgreSQL — paiement, rendu des cartes, RSVP
 └── web/   Next.js 16 (App Router) · React 19 · CSS pur — vitrine, atelier, espaces
 ```
@@ -33,7 +33,7 @@ Les prix et limites font foi dans [api/src/packs.ts](api/src/packs.ts).
    idempotente → mise en file de production.
 4. **Production** ([fulfillment.ts](api/src/services/fulfillment.ts)) : fond IA
    (Super) → cartes PNG (satori + resvg WASM) → ZIP → envoi WhatsApp/SMS (Super).
-   Les commandes interrompues reprennent au redémarrage.
+   Reprenable : une production interrompue (limite de temps, redémarrage) repart d'où elle s'était arrêtée.
 5. **Espace client** (`/espace/:token`, lien privé sans compte) : avancement en
    direct, téléchargement du ZIP, compteurs Présent / Absent / En attente,
    liste des invités, relances (appelé, note, réponse saisie au téléphone),
@@ -43,8 +43,8 @@ Les prix et limites font foi dans [api/src/packs.ts](api/src/packs.ts).
 7. **Back-office** (`/admin`, jeton `ADMIN_TOKEN`) : commandes, chiffre
    d'affaires, file d'appels du centre de relance (`GET /api/admin/followups`).
 
-Le temps réel passe par des Server-Sent Events (`/api/orders/:token/stream`,
-`/api/rsvp/:token/stream`).
+Le temps réel passe par des Server-Sent Events alimentés par la base
+(`/api/orders/:token/stream`, `/api/rsvp/:token/stream`).
 
 ## Lancer en local
 
@@ -52,11 +52,11 @@ Prérequis : Node 22+. Aucune base à installer : PGlite (Postgres en WASM) sert
 de base locale sur le port 5433.
 
 ```bash
-cd sceau/api && npm install && npx prisma generate && npm run dev
+cd api && npm install && npx prisma generate && npm run dev
 ```
 
 ```bash
-cd sceau/web && npm install && npm run dev
+cd web && npm install && npm run dev
 ```
 
 - API : http://localhost:4000 · Site : http://localhost:3300
@@ -77,7 +77,7 @@ Deux projets Vercel sur le même dépôt, et un projet Supabase.
 1. **Supabase** (base + fichiers) : de préférence via l'intégration Vercel ↔
    Supabase sur le projet API, qui injecte `POSTGRES_PRISMA_URL`,
    `POSTGRES_URL_NON_POOLING`, `SUPABASE_URL` et `SUPABASE_SERVICE_ROLE_KEY`
-   (noms reconnus par l'API). Créer un bucket **privé** `sceau`.
+   (noms reconnus par l'API). Créer un bucket **privé** `carton`.
 2. **API** (projet Vercel, dossier racine `api`) : [api/vercel.json](api/vercel.json)
    compile le TypeScript, applique les migrations (`npm run vercel-build`) et
    sert toute l'API Express depuis une fonction ([api/api/index.js](api/api/index.js),

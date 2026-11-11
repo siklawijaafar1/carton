@@ -18,7 +18,7 @@ export function SealMark({ size = 34 }: { size?: number }) {
       <circle cx="32" cy="32" r="19" fill="none" stroke="#5c4420" strokeOpacity=".55" strokeWidth="1.2" />
       <circle cx="32" cy="32" r="15.5" fill="none" stroke="#fff6dc" strokeOpacity=".35" strokeWidth=".8" strokeDasharray="1.5 2.5" />
       <text x="32" y="40" textAnchor="middle" fontFamily="var(--font-display), serif" fontSize="23" fill="#4a3618" fillOpacity=".85">
-        S
+        C
       </text>
     </svg>
   );
@@ -26,9 +26,9 @@ export function SealMark({ size = 34 }: { size?: number }) {
 
 export function Logo({ href = "/" }: { href?: string }) {
   return (
-    <Link href={href} className="logo" aria-label="Sceau — accueil">
+    <Link href={href} className="logo" aria-label="Carton — accueil">
       <SealMark />
-      <span className="logo-mot">Sceau</span>
+      <span className="logo-mot">Carton</span>
       <style>{`
         .logo { display: inline-flex; align-items: center; gap: 12px; }
         .logo svg { transition: transform .8s var(--ease); }

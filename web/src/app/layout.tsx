@@ -13,7 +13,7 @@ const script = Great_Vibes({ subsets: ["latin"], weight: "400", variable: "--fon
 const sans = Jost({ subsets: ["latin"], weight: ["300", "400", "500"], variable: "--font-sans", display: "swap" });
 
 export const metadata: Metadata = {
-  title: { default: "Sceau — Invitations d'exception · Abidjan", template: "%s · Sceau" },
+  title: { default: "Carton — Invitations d'exception · Abidjan", template: "%s · Carton" },
   description:
     "Cartes d'invitation de luxe pour mariages, galas et anniversaires à Abidjan. Noms personnalisés, envoi WhatsApp & SMS, RSVP en temps réel. Paiement Wave, Orange Money, MTN, Moov, carte.",
 };

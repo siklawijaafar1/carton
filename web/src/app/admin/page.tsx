@@ -55,7 +55,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     try {
-      setJeton(sessionStorage.getItem("sceau:admin") ?? "");
+      setJeton(sessionStorage.getItem("carton:admin") ?? "");
     } catch {}
   }, []);
 
@@ -78,7 +78,7 @@ export default function AdminPage() {
       if (err.status === 401) {
         setJeton("");
         try {
-          sessionStorage.removeItem("sceau:admin");
+          sessionStorage.removeItem("carton:admin");
         } catch {}
       }
     }
@@ -109,7 +109,7 @@ export default function AdminPage() {
             onSubmit={(e) => {
               e.preventDefault();
               try {
-                sessionStorage.setItem("sceau:admin", saisie);
+                sessionStorage.setItem("carton:admin", saisie);
               } catch {}
               setJeton(saisie);
             }}

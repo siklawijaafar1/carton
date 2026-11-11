@@ -29,9 +29,9 @@ function icsFile(d: InvitationData) {
   return [
     "BEGIN:VCALENDAR",
     "VERSION:2.0",
-    "PRODID:-//Sceau//Invitation//FR",
+    "PRODID:-//Carton//Invitation//FR",
     "BEGIN:VEVENT",
-    `UID:${fmt(start)}-${encodeURIComponent(d.event.title)}@sceau`,
+    `UID:${fmt(start)}-${encodeURIComponent(d.event.title)}@carton`,
     `DTSTAMP:${fmt(new Date())}`,
     `DTSTART:${fmt(start)}`,
     `DTEND:${fmt(end)}`,

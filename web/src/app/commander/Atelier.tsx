@@ -200,7 +200,7 @@ export function Atelier() {
         }),
       });
       try {
-        localStorage.setItem("sceau:derniere-commande", accessToken);
+        localStorage.setItem("carton:derniere-commande", accessToken);
       } catch {}
       const { paymentUrl } = await api<{ paymentUrl: string }>(`/orders/${accessToken}/checkout`, { method: "POST" });
       window.location.href = paymentUrl;

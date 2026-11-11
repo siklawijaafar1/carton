@@ -33,7 +33,7 @@ export async function startCheckout(order: Order): Promise<{ paymentUrl: string;
   const { paymentUrl } = await initPayment({
     transactionId,
     amount: PACKS[order.pack].price,
-    description: `Sceau ${PACKS[order.pack].name} ${order.eventTitle}`,
+    description: `Carton ${PACKS[order.pack].name} ${order.eventTitle}`,
     customerName: order.clientName,
     customerEmail: order.clientEmail,
     customerPhone: order.clientPhone,
